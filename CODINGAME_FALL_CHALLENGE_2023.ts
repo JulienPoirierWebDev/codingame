@@ -2,7 +2,7 @@
  * Score points by scanning valuable fish faster than your opponent.
  **/
 
-const updateCreature = (creatureToUpdate:CreatureType, newData: {creatureX:number, creatureY:number, creatureVx:number, creatureVy:number}, actualTurn:number) => {
+const updateVisibleCreature = (creatureToUpdate:CreatureType, newData: {creatureX:number, creatureY:number, creatureVx:number, creatureVy:number}, actualTurn:number) => {
 
     creatureToUpdate.creatureX = newData.creatureX;
     creatureToUpdate.creatureY = newData.creatureY;
@@ -11,6 +11,18 @@ const updateCreature = (creatureToUpdate:CreatureType, newData: {creatureX:numbe
     creatureToUpdate.futureCreatureY = newData.creatureY + newData.creatureVy;
     creatureToUpdate.turnLastSee = actualTurn;
     creatureToUpdate.isVisible = true;
+}
+
+const updateNotVisiblesCreatures = (groupOfCreatures) => {
+    const creaturesNotVisible = groupOfCreatures.filter((creature) => !creature.isVisible)
+
+    for(let i = 0; i < creaturesNotVisible.length; i++) {
+        if(creaturesNotVisible[i].creatureVx && creaturesNotVisible[i].creatureVy) {
+            creaturesNotVisible[i].creatureX = creaturesNotVisible[i].creatureX + creaturesNotVisible[i].creatureVx
+            creaturesNotVisible[i].creatureY = creaturesNotVisible[i].creatureY + creaturesNotVisible[i].creatureVy
+
+        }
+    }
 }
 
 type PointType = {
@@ -30,10 +42,13 @@ type CreatureType = {
     isScannedByFoe:boolean,
     creatureX?:number,
     creatureY?:number,
+    creatureVx?:number,
+    creatureVy?:number,
     futureCreatureX?:number,
     futureCreatureY?:number,
     turnLastSee:number,
-    isVisible:boolean
+    isVisible:boolean,
+    side?:"TL"|"TR"|"BL"|"BR",
 }
 
 type GroupOfCreatureType = CreatureType[];
@@ -51,7 +66,8 @@ type DroneType = {
     goRight?:boolean,
     goBottom?:boolean,
     dangerNear?:boolean,
-    side?:"TL"|"TR"|"BL"|"BR"
+    side?:"TL"|"TR"|"BL"|"BR",
+    dangerCreature?:CreatureType[]
 }
 
 let groupOfMyDrones:DroneType[] = []
@@ -84,7 +100,6 @@ for (let i = 0; i < creatureCount; i++) {
 
 let nearestCreature:CreatureType | null
 let minDistance:number;
-let targetZone:number = 2;
 
 // game loop
 while (true) {
@@ -136,7 +151,6 @@ while (true) {
             drone.dangerNear = false;
             drone.side = null;
 
-       
         } else {
             const newDrone = {
                 droneId,
@@ -148,7 +162,8 @@ while (true) {
                 name: `myDrone${i}`,
                 goRight:Boolean(i%2),
                 goBottom:true,
-                dangerNear:false
+                dangerNear:false,
+                dangerCreature:[]
             }
     
             groupOfMyDrones.push(newDrone)
@@ -213,21 +228,15 @@ while (true) {
         const creatureVy: number = parseInt(inputs[4]);
 
         const creature = groupOfCreatures.find(c => c.creatureId === creatureId);
-        updateCreature(creature, {creatureX, creatureY, creatureVx, creatureVy}, actualTurn)
-
+ 
+        updateVisibleCreature(creature, {creatureX, creatureY, creatureVx, creatureVy}, actualTurn)
+        if(creature.type === -1) {
+            console.error(creature)
+        }
     }
 
+    updateNotVisiblesCreatures(groupOfCreatures);
 
-    const isCreatureOfType2 = Boolean(groupOfCreatures.find((creature) => creature.type === 2 && creature.isScannedByMe === false))
-    const isCreatureOfType1 = Boolean(groupOfCreatures.find((creature) => creature.type === 1 && creature.isScannedByMe === false))
-
-    if(isCreatureOfType2) {
-        targetZone = 2
-    } else if(isCreatureOfType1) {
-        targetZone = 1
-    } else {
-        targetZone = 0
-    }
 
     const radarBlipCount: number = parseInt(readline());
     for (let i = 0; i < radarBlipCount; i++) {
@@ -236,55 +245,58 @@ while (true) {
         const creatureId: number = parseInt(inputs[1]);
         const radar: string = inputs[2];
 
+        let modifyX = 0
+
         const dangerousCreature = groupOfCreatures.find((creature) => creature.type === -1 && creature.creatureId === creatureId)
 
         const actualDrone = groupOfMyDrones.find((drone) => drone.droneId === droneId)
 
-        if(dangerousCreature && dangerousCreature.isVisible) {
-            actualDrone.dangerNear = true;
-            if(radar === "TL" || radar === "TR" ||  radar ==="BL" || radar === "BR") {
-                actualDrone.side = radar;
+        if(dangerousCreature) {
+            const distance = getDistance({x:dangerousCreature.creatureX, y:dangerousCreature.creatureY}, {x:actualDrone.droneX, y:actualDrone.droneY})
+
+            // if(dangerousCreature && distance < 1100) {
+            //     console.error(dangerousCreature)
+            // }
+    
+            if(dangerousCreature && distance < 1500) {
+                actualDrone.dangerNear = true;
+                console.error("DANGER")
+                actualDrone.dangerCreature.push(dangerousCreature)
+                
+                if(radar === "TL" || radar === "TR" ||  radar ==="BL" || radar === "BR") {
+                    actualDrone.side = radar;
+                }
             }
         }
+ 
+
+        if(actualDrone.side === "BR" || actualDrone.side === "TR") {
+            if(actualDrone.goRight === true) {
+                actualDrone.goRight = false;
+                modifyX =  -500
+            }
+        } else if(actualDrone.side === "TL" || actualDrone.side === "BL") {
+            if(actualDrone.goRight === false) {
+                actualDrone.goRight = true;
+                modifyX = 500
+            }
+        }
+
+        if(actualDrone.dangerCreature) {
+            for(let dangerIndex = 0; dangerIndex < actualDrone.dangerCreature.length; dangerIndex++) {
+                if( getDistance({x:actualDrone.droneX, y:actualDrone.droneY}, {x:actualDrone.dangerCreature[dangerIndex].creatureX, y:actualDrone.dangerCreature[dangerIndex].creatureY}) < 800 && actualDrone.droneY > 8000) {
+                    actualDrone.goBottom = false;
+                }
+            }
+         
+        }
+
         
-  
-        //console.error(droneId, creatureId, radar)
     }
 
 
-    // for(let i = 0; i < groupOfCreatures.length ; i++) {
-
-    //     const testedCreature = groupOfCreatures[i]
-
-    //     for(let droneIndex = 0; droneIndex < groupOfMyDrones.length; droneIndex++) {
-
-    //         const actualDrone = groupOfMyDrones[droneIndex];
-
-    //         const isAlreadyScan = Boolean(actualDrone.actualScans.find((creatureId) => creatureId === testedCreature.creatureId))
-
-    //         if(testedCreature.isScannedByMe === false && !isAlreadyScan) {
-    //             const distanceBetweenDrone1AndCreature = getDistance({x:testedCreature.creatureX, y:testedCreature.creatureY}, {x: actualDrone.droneX, y :  actualDrone.droneY})
-    
-    //             if(distanceBetweenDrone1AndCreature<actualDrone.nearestCreatureDistance) {
-        
-    //                 actualDrone.nearestCreatureDistance = distanceBetweenDrone1AndCreature;
-        
-    //                 actualDrone.nearestCreature = testedCreature
-    //             }
-    //         }
-            
-    //     }
-    // }
-
-
     for (let i = 0; i < myDroneCount; i++) {
-        //console.error(groupOfMyDrones[i])
-        // Write an action using console.log()
-        // To debug: console.error('Debug messages...');
-
-
-
-
+  
         if(groupOfMyDrones[i].droneY < 500) {
             groupOfMyDrones[i].actualScans = []
         }
@@ -297,45 +309,20 @@ while (true) {
             groupOfMyDrones[i].goBottom = false;
         }
 
-        console.error(groupOfMyDrones[i])
-
-        if(groupOfMyDrones[i].side === "BR" || groupOfMyDrones[i].side === "TR") {
-            if(groupOfMyDrones[i].goRight === true) {
-                groupOfMyDrones[i].goRight = false;
-            }
-        } else if(groupOfMyDrones[i].side === "TL" || groupOfMyDrones[i].side === "BL") {
-            if(groupOfMyDrones[i].goRight === false) {
-                groupOfMyDrones[i].goRight = true;
-            }
-        }
-
+        //console.error(groupOfMyDrones[i])
 
         if( groupOfMyDrones[i].goBottom === false ) {
             console.log(`MOVE ${groupOfMyDrones[i].goRight ? 10000 : 0 } 0 0 REMONTE-${groupOfMyDrones[i].dangerNear ?"DANGER" :""}` )
         } else {
-
-            console.log(`MOVE ${groupOfMyDrones[i].goRight ? 10000 : 0 } 10000 ${groupOfMyDrones[i].dangerNear ? "0" : "1"} TARGETZONE-${targetZone}"-"${groupOfMyDrones[i].dangerNear ?"DANGER" :""}` )
-           
-
+            console.log(`MOVE ${groupOfMyDrones[i].goRight ? 10000 : 0 } 10000 ${groupOfMyDrones[i].dangerNear ? "0" : "1"} ${groupOfMyDrones[i].dangerNear ?"DANGER" :""}` )
         }
+
          //console.error(i, groupOfMyDrones[i].droneX, groupOfMyDrones[i].goRight)
         if(groupOfMyDrones[i].droneX > 8500) {
             groupOfMyDrones[i].goRight = false;
         } else if(groupOfMyDrones[i].droneX < 1500) {
             groupOfMyDrones[i].goRight = true
         }
-
-        // if(nearestCreature) {
-        //     console.log(`MOVE ${nearestCreature.creatureX} ${nearestCreature.creatureY} 1 SEARCH`)
-        // } else {
-        //     if(groupOfMyDrones[0].actualScans.length >= 2) {
-        //         console.log(`MOVE ${goRight ? 10000 : 0 } 0 0 REMONTE` )
-        //     } else {
-        //         console.log('WAIT 1');         // MOVE <x> <y> <light (1|0)> | WAIT <light (1|0)>
-        //     }
-        // }
-
-
     }
     //console.error(groupOfCreatures)
 }
