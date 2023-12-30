@@ -67,7 +67,9 @@ type DroneType = {
     goBottom?:boolean,
     dangerNear?:boolean,
     side?:"TL"|"TR"|"BL"|"BR",
-    dangerCreature?:CreatureType[]
+    dangerCreature?:CreatureType[],
+    newX?:number,
+    modifyX?:number
 }
 
 let groupOfMyDrones:DroneType[] = []
@@ -245,11 +247,19 @@ while (true) {
         const creatureId: number = parseInt(inputs[1]);
         const radar: string = inputs[2];
 
-        let modifyX = 0
 
         const dangerousCreature = groupOfCreatures.find((creature) => creature.type === -1 && creature.creatureId === creatureId)
 
         const actualDrone = groupOfMyDrones.find((drone) => drone.droneId === droneId)
+
+        actualDrone.modifyX = 0
+
+        if(actualDrone.goRight) {
+            actualDrone.newX = actualDrone.droneX + 400
+        } else {
+            actualDrone.newX = actualDrone.droneX - 400
+        }
+
 
         if(dangerousCreature) {
             const distance = getDistance({x:dangerousCreature.creatureX, y:dangerousCreature.creatureY}, {x:actualDrone.droneX, y:actualDrone.droneY})
@@ -273,12 +283,12 @@ while (true) {
         if(actualDrone.side === "BR" || actualDrone.side === "TR") {
             if(actualDrone.goRight === true) {
                 actualDrone.goRight = false;
-                modifyX =  -500
+                actualDrone.modifyX =  -500
             }
         } else if(actualDrone.side === "TL" || actualDrone.side === "BL") {
             if(actualDrone.goRight === false) {
                 actualDrone.goRight = true;
-                modifyX = 500
+                actualDrone.modifyX = 500
             }
         }
 
@@ -305,16 +315,18 @@ while (true) {
             groupOfMyDrones[i].goBottom = true;
         }
 
-        if(groupOfMyDrones[i].droneY > 9400) {
+        if(groupOfMyDrones[i].droneY > 8500) {
             groupOfMyDrones[i].goBottom = false;
         }
 
         //console.error(groupOfMyDrones[i])
-
-        if( groupOfMyDrones[i].goBottom === false ) {
-            console.log(`MOVE ${groupOfMyDrones[i].goRight ? 10000 : 0 } 0 0 REMONTE-${groupOfMyDrones[i].dangerNear ?"DANGER" :""}` )
+        if(groupOfMyDrones[i].dangerCreature.length >= 2) {
+            console.log(`MOVE ${groupOfMyDrones[i].newX + groupOfMyDrones[i].modifyX} 0 0 DANGER-${groupOfMyDrones[i].dangerNear ?"DANGER" :""}` )
+        }
+        else if( groupOfMyDrones[i].goBottom === false ) {
+            console.log(`MOVE ${groupOfMyDrones[i].newX + groupOfMyDrones[i].modifyX} 0 0 REMONTE-${groupOfMyDrones[i].dangerNear ?"DANGER" :""}` )
         } else {
-            console.log(`MOVE ${groupOfMyDrones[i].goRight ? 10000 : 0 } 10000 ${groupOfMyDrones[i].dangerNear ? "0" : "1"} ${groupOfMyDrones[i].dangerNear ?"DANGER" :""}` )
+            console.log(`MOVE ${groupOfMyDrones[i].newX + groupOfMyDrones[i].modifyX} 10000 ${groupOfMyDrones[i].dangerNear ? "0" : "1"} ${groupOfMyDrones[i].dangerNear ?"DANGER" :""}` )
         }
 
          //console.error(i, groupOfMyDrones[i].droneX, groupOfMyDrones[i].goRight)
@@ -323,6 +335,8 @@ while (true) {
         } else if(groupOfMyDrones[i].droneX < 1500) {
             groupOfMyDrones[i].goRight = true
         }
+
+        groupOfMyDrones[i].dangerCreature = []
     }
     //console.error(groupOfCreatures)
 }
