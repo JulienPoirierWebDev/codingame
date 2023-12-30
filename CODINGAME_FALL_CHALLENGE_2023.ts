@@ -69,7 +69,8 @@ type DroneType = {
     side?:"TL"|"TR"|"BL"|"BR",
     dangerCreature?:CreatureType[],
     newX?:number,
-    modifyX?:number
+    modifyX?:number,
+    modifyY?:number
 }
 
 let groupOfMyDrones:DroneType[] = []
@@ -100,16 +101,15 @@ for (let i = 0; i < creatureCount; i++) {
     groupOfCreatures.push(newCreature)
 }
 
+console.error(groupOfCreatures.length)
+
 let nearestCreature:CreatureType | null
-let minDistance:number;
 
 // game loop
 while (true) {
     actualTurn++
 
-    minDistance = 10000;
     nearestCreature = null;
-    //groupOfMyDrones = []
 
     for(let creatureIndex = 0; creatureIndex < groupOfCreatures.length; creatureIndex++ ) {
         groupOfCreatures[creatureIndex].isVisible = false;
@@ -307,6 +307,24 @@ while (true) {
 
     for (let i = 0; i < myDroneCount; i++) {
   
+        groupOfMyDrones[i].modifyX = 0;
+        groupOfMyDrones[i].modifyY = 0;
+        console.error(groupOfMyDrones[i].dangerCreature)
+
+        for(let y = 0; y < groupOfMyDrones[i].dangerCreature.length; y++) {
+            const actualCreature = groupOfMyDrones[i].dangerCreature[y]
+            const creatureDistance = getDistance({x:groupOfMyDrones[i].droneX, y:groupOfMyDrones[i].droneY}, {x:actualCreature.creatureX, y:actualCreature.creatureY});
+
+            if(creatureDistance > 1500) {
+                const diffX = groupOfMyDrones[i].droneX - actualCreature.creatureX;
+                const diffY =  groupOfMyDrones[i].droneY - actualCreature.creatureY;
+
+                groupOfMyDrones[i].modifyX -= diffX;
+                groupOfMyDrones[i].modifyY = groupOfMyDrones[i].droneY - diffY;
+
+            }
+        }
+
         if(groupOfMyDrones[i].droneY < 500) {
             groupOfMyDrones[i].actualScans = []
         }
@@ -322,6 +340,10 @@ while (true) {
         //console.error(groupOfMyDrones[i])
         if(groupOfMyDrones[i].dangerCreature.length >= 2) {
             console.log(`MOVE ${groupOfMyDrones[i].newX + groupOfMyDrones[i].modifyX} 0 0 DANGER-${groupOfMyDrones[i].dangerNear ?"DANGER" :""}` )
+        }
+        else if (groupOfMyDrones[i].modifyY) {
+            console.log(`MOVE ${groupOfMyDrones[i].newX + groupOfMyDrones[i].modifyX} ${groupOfMyDrones[i].modifyY} 0 REMONTE-${groupOfMyDrones[i].dangerNear ?"DANGER" :""}` )
+
         }
         else if( groupOfMyDrones[i].goBottom === false ) {
             console.log(`MOVE ${groupOfMyDrones[i].newX + groupOfMyDrones[i].modifyX} 0 0 REMONTE-${groupOfMyDrones[i].dangerNear ?"DANGER" :""}` )
